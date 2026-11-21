@@ -225,7 +225,7 @@ function renderPublicGuestbook(){
  const list=document.querySelector('#guestbook-list');list.replaceChildren();
  list.setAttribute('aria-busy',String(guestbookLoading));
  const status=document.querySelector('#guestbook-status');
- status.textContent=guestbookState==='loading'?(chinese?'正在读取公开留言…':'Loading public comments…'):guestbookState==='error'?(chinese?'暂时无法读取留言。请重试，或点击“在 GitHub 查看全部”；仍可前往 GitHub 留言。':'Comments could not be loaded. Retry or use View all on GitHub; you can still post there.'):guestbookState==='ready'?(chinese?`已读取 ${publicComments.length} 条公开留言${publicComments.length===100?'（更多留言请在 GitHub 查看）':''}。`:`${publicComments.length} public comments loaded${publicComments.length===100?' (see GitHub for more)':''}.`):'';
+ status.textContent=guestbookState==='loading'?(chinese?'正在读取公开留言…':'Loading public comments…'):guestbookState==='error'?(chinese?'暂时无法读取留言。请重试，或点击“在 GitHub 查看全部”；仍可前往 GitHub 留言。':'Comments could not be loaded. Retry or use View all on GitHub; you can still post there.'):'';
  document.querySelector('#guestbook-empty').hidden=guestbookState!=='ready'||publicComments.length!==0;
  publicComments.forEach(comment=>{
   const article=document.createElement('article');article.className='guestbook-note';
