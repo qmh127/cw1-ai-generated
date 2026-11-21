@@ -280,21 +280,16 @@ if('IntersectionObserver' in window){
   if(!frame||event.source!==frame.contentWindow)return;
   const data=event.data?.giscus;
   if(!data||typeof data!=='object')return;
-  if(data.error){restore();return;}
   if(Number(data.resizeHeight)>0){
    clearTimeout(timeout);
    if(!activated){activated=true;fallback.forEach(el=>el.hidden=true);sync();}
   }
  });
  new MutationObserver(sync).observe(document.documentElement,{attributes:true,attributeFilter:['lang','data-theme']});
- async function mount(){
-  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);
+ function mount(){
   try{
-   const response=await fetch('https://giscus.app/api/discussions/categories?repo=qmh127%2Fcw1-ai-generated',{credentials:'omit',signal:controller.signal});
-   if(!response.ok)return;
-   const data=await response.json();
-   const category=data.categories?.find(item=>item.name==='Announcements');
-   if(data.repositoryId!=='R_kgDOVTSALg'||!category?.id)return;
+   const data={repositoryId:'R_kgDOVTSALg'};
+   const category={name:'Announcements',id:'DIC_kwDOVTSALs4DLriz'};
    host=document.createElement('div');host.className='giscus';host.style.marginTop='24px';
    section.insertBefore(host,fallback[0]);
    const script=document.createElement('script');script.src='https://giscus.app/client.js';script.async=true;script.crossOrigin='anonymous';
@@ -305,7 +300,6 @@ if('IntersectionObserver' in window){
    timeout=setTimeout(()=>{if(!activated)restore();},20000);
    host.append(script);
   }catch{/* Keep the existing guestbook available. */}
-  finally{clearTimeout(timer);}
  }
  if('IntersectionObserver' in window){
   const observer=new IntersectionObserver(entries=>{
