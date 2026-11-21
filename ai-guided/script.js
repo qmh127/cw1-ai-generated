@@ -257,3 +257,59 @@ if('IntersectionObserver' in window){
  const commentsObserver=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){commentsObserver.disconnect();loadPublicGuestbook();}},{rootMargin:'250px'});
  commentsObserver.observe(document.querySelector('#guestbook'));
 }else loadPublicGuestbook();
+
+// Upgrade to an inline composer only after the repository has Giscus installed.
+// Until then, or if the external service fails, retain the working Issue guestbook.
+(()=>{
+ const section=document.querySelector('#guestbook');
+ const fallback=[...section.children].filter(el=>!el.matches('.eyebrow,h2'));
+ let host,activated=false,timeout;
+ const config=()=>({lang:document.documentElement.lang==='zh-CN'?'zh-CN':'en',theme:document.documentElement.dataset.theme==='dark'?'dark_dimmed':'light'});
+ function sync(){
+  const frame=host?.querySelector('iframe.giscus-frame');
+  if(frame)frame.contentWindow.postMessage({giscus:{setConfig:config()}},'https://giscus.app');
+ }
+ function restore(){
+  clearTimeout(timeout);host?.remove();host=null;activated=false;
+  fallback.forEach(el=>{if(el.id!=='guestbook-empty')el.hidden=false;});
+  renderPublicGuestbook();
+ }
+ window.addEventListener('message',event=>{
+  if(event.origin!=='https://giscus.app'||!host)return;
+  const frame=host.querySelector('iframe.giscus-frame');
+  if(!frame||event.source!==frame.contentWindow)return;
+  const data=event.data?.giscus;
+  if(!data||typeof data!=='object')return;
+  if(data.error){restore();return;}
+  if(Number(data.resizeHeight)>0){
+   clearTimeout(timeout);
+   if(!activated){activated=true;fallback.forEach(el=>el.hidden=true);sync();}
+  }
+ });
+ new MutationObserver(sync).observe(document.documentElement,{attributes:true,attributeFilter:['lang','data-theme']});
+ async function mount(){
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);
+  try{
+   const response=await fetch('https://giscus.app/api/discussions/categories?repo=qmh127%2Fcw1-ai-generated',{credentials:'omit',signal:controller.signal});
+   if(!response.ok)return;
+   const data=await response.json();
+   const category=data.categories?.find(item=>item.name==='Announcements');
+   if(data.repositoryId!=='R_kgDOVTSALg'||!category?.id)return;
+   host=document.createElement('div');host.className='giscus';host.style.marginTop='24px';
+   section.insertBefore(host,fallback[0]);
+   const script=document.createElement('script');script.src='https://giscus.app/client.js';script.async=true;script.crossOrigin='anonymous';
+   const current=config();
+   const settings={repo:'qmh127/cw1-ai-generated','repo-id':data.repositoryId,category:category.name,'category-id':category.id,mapping:'specific',term:'Meihui Qu Portfolio Guestbook',strict:'1','reactions-enabled':'1','emit-metadata':'0','input-position':'top',theme:current.theme,lang:current.lang,loading:'lazy'};
+   Object.entries(settings).forEach(([key,value])=>script.setAttribute('data-'+key,value));
+   script.addEventListener('error',restore,{once:true});
+   timeout=setTimeout(()=>{if(!activated)restore();},20000);
+   host.append(script);
+  }catch{/* Keep the existing guestbook available. */}
+  finally{clearTimeout(timer);}
+ }
+ if('IntersectionObserver' in window){
+  const observer=new IntersectionObserver(entries=>{
+   if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();mount();}
+  },{rootMargin:'250px'});observer.observe(section);
+ }else mount();
+})();
