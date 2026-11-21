@@ -271,7 +271,7 @@ if('IntersectionObserver' in window){
  }
  function restore(){
   clearTimeout(timeout);host?.remove();host=null;activated=false;
-  fallback.forEach(el=>{if(el.id!=='guestbook-empty')el.hidden=false;});
+  fallback.forEach(el=>{el.style.removeProperty('display');if(el.id!=='guestbook-empty')el.hidden=false;});
   renderPublicGuestbook();
  }
  window.addEventListener('message',event=>{
@@ -282,7 +282,7 @@ if('IntersectionObserver' in window){
   if(!data||typeof data!=='object')return;
   if(Number(data.resizeHeight)>0){
    clearTimeout(timeout);
-   if(!activated){activated=true;fallback.forEach(el=>el.hidden=true);sync();}
+   if(!activated){activated=true;fallback.forEach(el=>{el.hidden=true;el.style.display='none';});sync();}
   }
  });
  new MutationObserver(sync).observe(document.documentElement,{attributes:true,attributeFilter:['lang','data-theme']});
