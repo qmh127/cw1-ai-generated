@@ -209,52 +209,51 @@ document.querySelector('.project-gallery').addEventListener('keydown',event=>{
 galleryImage.addEventListener('error',()=>{galleryImage.hidden=true;document.querySelector('#gallery-placeholder').hidden=false;});
 renderGallery();
 
-// Browser-local notes. Use textContent throughout; no visitor HTML is evaluated.
-const guestbookKey='meihui-guestbook-v1';
-let guestbookNotes=[];
-try{
- const saved=JSON.parse(localStorage.getItem(guestbookKey)||'[]');
- if(Array.isArray(saved))guestbookNotes=saved.filter(note=>note&&typeof note.id==='string'&&typeof note.author==='string'&&typeof note.note==='string'&&Number.isFinite(note.time)&&Math.abs(note.time)<=8640000000000000).slice(0,50);
-}catch{}
-function renderGuestbook(){
- const chinese=document.documentElement.lang==='zh-CN';
- const list=document.querySelector('#guestbook-list');list.replaceChildren();
- document.querySelector('#guestbook-empty').hidden=guestbookNotes.length>0;
- guestbookNotes.forEach(note=>{
-  const article=document.createElement('article');article.className='guestbook-note';
-  const header=document.createElement('header');
-  const name=document.createElement('strong');name.textContent=note.author;
-  const time=document.createElement('time');time.dateTime=new Date(note.time).toISOString();time.textContent=new Date(note.time).toLocaleString(chinese?'zh-CN':'en-GB',{dateStyle:'medium',timeStyle:'short'});
-  const remove=document.createElement('button');remove.type='button';remove.textContent=chinese?'删除':'Delete';remove.setAttribute('aria-label',`${chinese?'删除留言：':'Delete note by '}${note.author}`);
-  remove.addEventListener('click',()=>{
-   const next=guestbookNotes.filter(item=>item.id!==note.id);
-   try{localStorage.setItem(guestbookKey,JSON.stringify(next));guestbookNotes=next;renderGuestbook();document.querySelector('#guestbook-status').textContent=chinese?'留言已删除。':'Local note deleted.';}
-   catch{document.querySelector('#guestbook-status').textContent=chinese?'浏览器存储不可用，未能删除。':'Browser storage is unavailable; deletion was not saved.';}
-  });
-  header.append(name,time,remove);
-  const body=document.createElement('p');body.textContent=note.note;
-  article.append(header,body);list.append(article);
- });
-}
-document.querySelector('#guestbook-form').addEventListener('submit',event=>{
- event.preventDefault();const form=event.currentTarget;const chinese=document.documentElement.lang==='zh-CN';
- const author=form.elements.author.value.trim(),note=form.elements.note.value.trim();
- const status=document.querySelector('#guestbook-status');
- if(!author||!note){status.textContent=chinese?'请填写称呼和留言内容。':'Please enter a name and message.';return;}
- if(guestbookNotes.length>=50){status.textContent=chinese?'最多保存 50 条，请先删除旧留言。':'Up to 50 notes can be saved; delete an older note first.';return;}
- const next=[{id:globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`,author:author.slice(0,60),note:note.slice(0,1000),time:Date.now()},...guestbookNotes];
- try{
-  localStorage.setItem(guestbookKey,JSON.stringify(next));guestbookNotes=next;renderGuestbook();form.reset();
-  status.textContent=chinese?'已保存在当前浏览器，未公开、未发送。':'Saved in this browser only. Not public and not sent.';
- }catch{status.textContent=chinese?'无法访问本地存储，留言未保存，请复制内容自行保留。':'Local storage is unavailable. The note was not saved; copy your text to keep it.';}
-});
-document.querySelector('#language-toggle').addEventListener('click',renderGuestbook);
-document.querySelector('#language-select').addEventListener('change',renderGuestbook);
-renderGuestbook();
-
 document.querySelector('#language-select').addEventListener('change',renderGallery);
 projects.forEach((project,index)=>project.addEventListener('click',event=>{
  if(event.target.closest('a,button,summary,details'))return;
  const first=galleryPhotos.findIndex(photo=>photo.projectIndex===index);
  if(first>=0){galleryIndex=first;renderGallery();}
 }));
+
+// Public shared comments are read anonymously; posting is authenticated on GitHub.
+// No access token, visitor form data or private local notes are sent by this page.
+const publicGuestbookAPI='https://api.github.com/repos/qmh127/cw1-ai-generated/issues/2/comments?per_page=100';
+let publicComments=[],guestbookState='idle',guestbookLoading=false;
+function renderPublicGuestbook(){
+ const chinese=document.documentElement.lang==='zh-CN';
+ const list=document.querySelector('#guestbook-list');list.replaceChildren();
+ list.setAttribute('aria-busy',String(guestbookLoading));
+ const status=document.querySelector('#guestbook-status');
+ status.textContent=guestbookState==='loading'?(chinese?'正在读取公开留言…':'Loading public comments…'):guestbookState==='error'?(chinese?'暂时无法读取留言。请重试，或点击“在 GitHub 查看全部”；仍可前往 GitHub 留言。':'Comments could not be loaded. Retry or use View all on GitHub; you can still post there.'):guestbookState==='ready'?(chinese?`已读取 ${publicComments.length} 条公开留言${publicComments.length===100?'（更多留言请在 GitHub 查看）':''}。`:`${publicComments.length} public comments loaded${publicComments.length===100?' (see GitHub for more)':''}.`):'';
+ document.querySelector('#guestbook-empty').hidden=guestbookState!=='ready'||publicComments.length!==0;
+ publicComments.forEach(comment=>{
+  const article=document.createElement('article');article.className='guestbook-note';
+  const header=document.createElement('header');const author=document.createElement('strong');author.textContent=comment.user?.login||'GitHub user';
+  const time=document.createElement('time');const date=new Date(comment.created_at);
+  if(Number.isFinite(date.getTime())){time.dateTime=date.toISOString();time.textContent=date.toLocaleString(chinese?'zh-CN':'en-GB',{dateStyle:'medium',timeStyle:'short'});}
+  const link=document.createElement('a');link.href=`https://github.com/qmh127/cw1-ai-generated/issues/2#issuecomment-${comment.id}`;link.target='_blank';link.rel='noopener noreferrer';link.textContent=chinese?'查看 / 回复':'View / Reply';
+  header.append(author,time,link);const body=document.createElement('p');body.textContent=comment.body||'';article.append(header,body);list.append(article);
+ });
+ document.querySelector('#guestbook-refresh').disabled=guestbookLoading;
+}
+async function loadPublicGuestbook(){
+ if(guestbookLoading)return;
+ guestbookLoading=true;guestbookState='loading';renderPublicGuestbook();
+ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
+ try{
+  const response=await fetch(publicGuestbookAPI,{headers:{Accept:'application/vnd.github+json'},credentials:'omit',signal:controller.signal});
+  if(!response.ok)throw new Error(`HTTP ${response.status}`);
+  const data=await response.json();if(!Array.isArray(data))throw new Error('Invalid comments response');
+  publicComments=data.filter(item=>Number.isSafeInteger(item.id)&&typeof item.body==='string').reverse();guestbookState='ready';
+ }catch{guestbookState='error';}
+ finally{clearTimeout(timer);guestbookLoading=false;renderPublicGuestbook();}
+}
+document.querySelector('#guestbook-refresh').addEventListener('click',loadPublicGuestbook);
+document.querySelector('#language-toggle').addEventListener('click',renderPublicGuestbook);
+document.querySelector('#language-select').addEventListener('change',renderPublicGuestbook);
+// Avoid blocking initial rendering or fetching comments before visitors reach them.
+if('IntersectionObserver' in window){
+ const commentsObserver=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){commentsObserver.disconnect();loadPublicGuestbook();}},{rootMargin:'250px'});
+ commentsObserver.observe(document.querySelector('#guestbook'));
+}else loadPublicGuestbook();
